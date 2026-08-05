@@ -99,6 +99,16 @@ if IS_PRODUCTION:
 # Respect reverse-proxy headers in production deployments.
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
+# Sentry (optional) for error tracking
+try:
+    import sentry_sdk
+    from sentry_sdk.integrations.flask import FlaskIntegration
+    SENTRY_DSN = os.getenv('SENTRY_DSN', '').strip()
+    if SENTRY_DSN:
+        sentry_sdk.init(dsn=SENTRY_DSN, integrations=[FlaskIntegration()])
+except Exception:
+    pass
+
 logging.basicConfig(level=logging.INFO)
 DB_PATH = os.path.join(app.instance_path, "feedback.db")
 DATABASE_URL = (os.getenv("DATABASE_URL", "") or "").strip()
@@ -1435,22 +1445,20 @@ def ai_suggest_mappings():
 @app.route('/api/ai/report', methods=['POST'])
 def ai_report():
     if 'user' not in session: return jsonify({"error": "Unauthorized"}), 401
-    if not ai_provider: return jsonify({"report": "<p>AI Offline. Set GEMINI_API_KEY or GROQ_API_KEY.</p>"})
-    conn = get_db_connection(); c = conn.cursor()
-    c.execute("SELECT full_text_for_ai FROM responses WHERE form_id = ?", (request.json.get('form_id'),))
-    rows = c.fetchall(); conn.close()
-    
-    valid_texts = [r[0] for r in rows if r[0] and r[0].strip() and r[0].strip().lower() != 'none']
-    text_data = "\n- ".join(valid_texts)
-    
-    if not text_data.strip(): return jsonify({"report": "<p>No written feedback available.</p>"})
+    form_id = request.json.get('form_id')
+    if not form_id:
+        return jsonify({"error": "form_id required"}), 400
+    if not ai_provider:
+        return jsonify({"report": "<p>AI Offline. Set GEMINI_API_KEY or GROQ_API_KEY.</p>"})
+
+    # Enqueue AI report as a background task
     try:
-        report = ai_generate_text(
-            "Analyze the feedback. Generate an Executive Summary containing 'Top 3 Strengths' and 'Top 3 Actionable Improvements' using HTML tags (<h3>, <ul>, <li>). No markdown blocks.",
-            text_data[:6000]
-        )
-        return jsonify({"report": report.replace('```html', '').replace('```', '')})
-    except Exception as e: return jsonify({"error": str(e)}), 500
+        from celery_worker import ai_report_task
+        task = ai_report_task.delay(form_id)
+        return jsonify({"task_id": task.id, "status": "queued"}), 202
+    except Exception as e:
+        app.logger.error(f"Failed to enqueue AI report task: {e}")
+        return jsonify({"error": "Failed to enqueue task"}), 500
 
 @app.route('/api/outcome_risk', methods=['GET'])
 def outcome_risk():
@@ -1522,56 +1530,37 @@ def outcome_risk():
 @app.route('/api/suggest_followup_questions', methods=['POST'])
 def suggest_followup_questions():
     if 'user' not in session: return jsonify({"error": "Unauthorized"}), 401
-    if not ai_provider: return jsonify({"questions": [], "source": "offline"})
-    
     data = request.json or {}
     form_id = data.get('form_id')
     if not form_id:
         return jsonify({"error": "form_id required"}), 400
-    
-    conn = get_db_connection(row_factory=True); c = conn.cursor()
-    c.execute("SELECT * FROM forms WHERE id = ?", (form_id,))
-    form_data = c.fetchone()
-    
-    if not form_data:
-        conn.close()
-        return jsonify({"error": "Form not found"}), 404
-    
-    course_name = form_data['course_name']
-    c.execute("SELECT full_text_for_ai, sentiment_label FROM responses WHERE form_id = ? AND full_text_for_ai IS NOT NULL", (form_id,))
-    feedback_rows = c.fetchall()
-    conn.close()
-    
-    feedback_texts = [r['full_text_for_ai'] for r in feedback_rows if r['full_text_for_ai'] and r['full_text_for_ai'].strip()]
-    if not feedback_texts:
-        return jsonify({"questions": [], "source": "no_feedback"})
-    
-    aggregated_feedback = "\n- ".join(feedback_texts[:20])
-    
-    prompt = (
-        "Based on the student feedback below, suggest 3-4 specific follow-up questions to dive deeper into the main themes and concerns. "
-        "Return STRICT JSON only in the form: {\"questions\":[{\"text\":\"...\",\"type\":\"rating_5\",\"required\":true}]}.\n\n"
-        "Context:\n"
-        f"Course: {course_name}\n"
-        f"Number of responses: {len(feedback_texts)}\n\n"
-        "Feedback:\n"
-        f"- {aggregated_feedback}\n\n"
-        "Guidelines for follow-up questions:\n"
-        "- Dig deeper into pain points or gaps mentioned\n"
-        "- Ask specific, actionable questions (not generic)\n"
-        "- Use rating_5 type for majority, mix with text for open-ended\n"
-        "- Keep questions concise (under 20 words)\n"
-        "- Focus on discrete topics (lab issues, teaching clarity, pace, etc.)"
-    )
-    
+    if not ai_provider:
+        return jsonify({"questions": [], "source": "offline"})
+
     try:
-        raw = ai_generate_text("You suggest follow-up questions based on feedback. Return JSON only.", prompt)
-        followup = parse_ai_question_payload(raw, course_name)
-        if not followup:
-            return jsonify({"questions": [], "source": "parse_failed"})
-        return jsonify({"questions": followup[:4], "source": "ai"})
+        from celery_worker import suggest_followup_task
+        task = suggest_followup_task.delay(form_id)
+        return jsonify({"task_id": task.id, "status": "queued"}), 202
     except Exception as e:
-        return jsonify({"questions": [], "source": "error", "error": str(e)})
+        app.logger.error(f"Failed to enqueue followup suggestion task: {e}")
+        return jsonify({"error": "Failed to enqueue task"}), 500
+
+
+@app.route('/api/task_status/<task_id>', methods=['GET'])
+def task_status(task_id):
+    try:
+        from celery_worker import celery as celery_app
+        res = celery_app.AsyncResult(task_id)
+        info = {"id": task_id, "status": res.status}
+        try:
+            if res.status == 'SUCCESS':
+                info['result'] = res.result
+        except Exception:
+            pass
+        return jsonify(info)
+    except Exception as e:
+        app.logger.error(f"Task status error: {e}")
+        return jsonify({"error": "Unable to fetch task status"}), 500
 
 # --- ENGINE & EXPORTS ---
 def sort_key(k):

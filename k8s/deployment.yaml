@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-feedback-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ai-feedback
+  template:
+    metadata:
+      labels:
+        app: ai-feedback
+    spec:
+      containers:
+      - name: web
+        image: your-registry/ai-feedback:latest
+        ports:
+        - containerPort: 5050
+        env:
+        - name: DATABASE_URL
+          value: "<your_database_url>"
+        - name: REDIS_URL
+          value: "redis://redis:6379/0"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-feedback-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-feedback-worker
+  template:
+    metadata:
+      labels:
+        app: ai-feedback-worker
+    spec:
+      containers:
+      - name: worker
+        image: your-registry/ai-feedback:latest
+        command: ["celery", "-A", "celery_worker.celery", "worker", "-Q", "default", "--loglevel=info"]
+        env:
+        - name: DATABASE_URL
+          value: "<your_database_url>"
+        - name: REDIS_URL
+          value: "redis://redis:6379/0"

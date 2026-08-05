@@ -1,0 +1,13 @@
+[Unit]
+Description=Celery Worker for Ai-based-feedback-analyzer
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/srv/ai-feedback-analyzer
+Environment="REDIS_URL=redis://localhost:6379/0"
+ExecStart=/srv/ai-feedback-analyzer/.venv/bin/celery -A celery_worker.celery worker --loglevel=info -Q default
+
+[Install]
+WantedBy=multi-user.target

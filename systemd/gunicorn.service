@@ -1,0 +1,15 @@
+[Unit]
+Description=Gunicorn instance to serve Ai-based-feedback-analyzer
+After=network.target
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/srv/ai-feedback-analyzer
+Environment="FLASK_ENV=production"
+Environment="FLASK_SECRET_KEY=<replace-with-secret>"
+Environment="DATABASE_URL=<your_database_url>"
+ExecStart=/srv/ai-feedback-analyzer/.venv/bin/gunicorn -c /srv/ai-feedback-analyzer/gunicorn.conf.py wsgi:app
+
+[Install]
+WantedBy=multi-user.target
