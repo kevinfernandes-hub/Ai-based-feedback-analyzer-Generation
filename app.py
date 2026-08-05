@@ -53,11 +53,13 @@ APP_ENV = os.getenv("FLASK_ENV", "development").strip().lower()
 IS_PRODUCTION = APP_ENV == "production"
 
 # Rate limiting
+REDIS_URL = os.getenv("REDIS_URL", "").strip()
+limiter_storage = REDIS_URL if REDIS_URL else "memory://"
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri="memory://"
+    storage_uri=limiter_storage,
 )
 
 # Structured logging
@@ -116,8 +118,9 @@ def _is_duplicate_column_error(exc):
 
 def _ensure_column(conn, cursor, table_name, column_name, column_definition):
     if USE_POSTGRES:
+        # psycopg2 uses %s placeholders
         cursor.execute(
-            "SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?",
+            "SELECT 1 FROM information_schema.columns WHERE table_name = %s AND column_name = %s",
             (table_name, column_name),
         )
         if cursor.fetchone():
@@ -239,7 +242,9 @@ def apply_security_headers(response):
     return response
 
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+if IS_PRODUCTION and not ADMIN_PASSWORD:
+    raise RuntimeError("ADMIN_PASSWORD must be set in production environment")
 
 PO_LIST_FULL = [
     "PO1", "PO2", "PO3", "PO4", "PO5", "PO6",
@@ -1068,7 +1073,25 @@ def submit_feedback():
         c.execute('''INSERT INTO responses (form_id, form_title, student_name, attendance, answers_json, full_text_for_ai, sentiment_score, sentiment_label, timestamp) 
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
                   (data.get('form_id'), data.get('form_title'), data.get('student_name', 'Anonymous'), 100, json.dumps(answers), full_text, text_score, label, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-        conn.commit(); conn.close()
+        conn.commit()
+        try:
+            # Enqueue background processing (non-blocking). Worker processes handle heavy AI tasks.
+            from celery_worker import analyze_response
+            payload = {
+                "form_id": data.get('form_id'),
+                "form_title": data.get('form_title'),
+                "student_name": data.get('student_name', 'Anonymous'),
+                "full_text": full_text,
+                "answers": answers,
+            }
+            try:
+                analyze_response.delay(payload)
+            except Exception as _ex:
+                app.logger.warning(f"Failed to enqueue analyze task: {_ex}")
+        except Exception:
+            # If Celery is not configured, continue without background processing.
+            pass
+        conn.close()
         return jsonify({"status": "success"})
     except Exception as e:
         try:
