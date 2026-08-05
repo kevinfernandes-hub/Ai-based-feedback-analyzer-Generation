@@ -9,8 +9,18 @@ celery = Celery(
     backend=REDIS_URL,
 )
 
+# Recommended production Celery settings
+celery.conf.update(
+    task_serializer='json',
+    accept_content=['json'],
+    result_serializer='json',
+    task_acks_late=True,
+    worker_prefetch_multiplier=1,
+    task_default_queue='default',
+)
 
-@celery.task(bind=True)
+
+@celery.task(bind=True, acks_late=True, max_retries=3)
 def analyze_response(self, payload):
     """Background task placeholder: process a submitted response payload.
 
@@ -55,4 +65,8 @@ def analyze_response(self, payload):
             print("analyze_response task error:", str(e))
         except Exception:
             pass
-        raise
+        # Retry with exponential backoff
+        try:
+            raise self.retry(exc=e, countdown=30)
+        except Exception:
+            raise

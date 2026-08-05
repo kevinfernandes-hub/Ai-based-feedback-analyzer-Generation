@@ -17,6 +17,8 @@ from textblob import TextBlob
 from better_profanity import profanity
 from werkzeug.middleware.proxy_fix import ProxyFix
 from logging.handlers import RotatingFileHandler
+from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
+import multiprocessing
 import os as os_module
 try:
     psycopg2 = importlib.import_module("psycopg2")
@@ -101,13 +103,19 @@ logging.basicConfig(level=logging.INFO)
 DB_PATH = os.path.join(app.instance_path, "feedback.db")
 DATABASE_URL = (os.getenv("DATABASE_URL", "") or "").strip()
 if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = f"postgresql://{DATABASE_URL[len('postgres://'):]}"
+    DATABASE_URL = f"postgresql://{DATABASE_URL[len('postgres://'):] }"
 USE_POSTGRES = bool(DATABASE_URL)
 
 if USE_POSTGRES and not psycopg2:
     raise RuntimeError("DATABASE_URL is set but psycopg2 is not installed. Add psycopg2-binary to requirements.")
 
 DB_INTEGRITY_ERROR = (psycopg2.IntegrityError,) if USE_POSTGRES and psycopg2 else (sqlite3.IntegrityError,)
+# PostgreSQL connection pool (initialized lazily)
+PG_POOL = None
+
+# Prometheus metrics
+REQUEST_COUNTER = Counter('ai_feedback_requests_total', 'HTTP requests processed', ['endpoint', 'method', 'status'])
+BG_TASKS_ENQUEUED = Counter('ai_feedback_bg_enqueued_total', 'Background tasks enqueued')
 STUDENT_SUBMITTER_COOKIE = "student_submitter_id"
 
 
@@ -117,17 +125,15 @@ def _is_duplicate_column_error(exc):
 
 
 def _ensure_column(conn, cursor, table_name, column_name, column_definition):
-    if USE_POSTGRES:
-        # psycopg2 uses %s placeholders
-        cursor.execute(
-            "SELECT 1 FROM information_schema.columns WHERE table_name = %s AND column_name = %s",
-            (table_name, column_name),
-        )
+    # Use parameterized checks and adapt placeholders for the active DB driver
+    check_query = _adapt_placeholders("SELECT 1 FROM information_schema.columns WHERE table_name = ? AND column_name = ?")
+    try:
+        cursor.execute(check_query, (table_name, column_name))
         if cursor.fetchone():
             return
-        cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}")
-        return
-
+    except Exception:
+        # If information_schema isn't available (e.g., SQLite) or the query fails, continue and attempt ALTER
+        pass
     try:
         cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_definition}")
     except sqlite3.OperationalError as e:
@@ -183,17 +189,44 @@ class DbConnectionAdapter:
         return self._conn.rollback()
 
     def close(self):
+        # If a PostgreSQL pool is configured, return connection to pool instead of closing
+        global PG_POOL
+        try:
+            if PG_POOL is not None and hasattr(PG_POOL, 'putconn'):
+                try:
+                    PG_POOL.putconn(self._conn)
+                    return
+                except Exception:
+                    pass
+        except Exception:
+            pass
         return self._conn.close()
 
 
 def get_db_connection(row_factory=False):
+    global PG_POOL
     if USE_POSTGRES:
-        connect_kwargs = {"connect_timeout": 10}
-        if "sslmode=" not in DATABASE_URL:
-            connect_kwargs["sslmode"] = "require"
-        conn = psycopg2.connect(DATABASE_URL, **connect_kwargs)
-        conn.autocommit = False
-        return DbConnectionAdapter(conn, row_factory=row_factory)
+        # Prefer a pooled connection if available
+        try:
+            if PG_POOL is None:
+                from psycopg2 import pool as _pool
+                minconn = int(os.getenv('PG_POOL_MIN', '1'))
+                maxconn = int(os.getenv('PG_POOL_MAX', '10'))
+                conn_kwargs = {}
+                if 'sslmode=' not in DATABASE_URL:
+                    conn_kwargs['sslmode'] = 'require'
+                PG_POOL = _pool.ThreadedConnectionPool(minconn, maxconn, dsn=DATABASE_URL, **conn_kwargs)
+            raw_conn = PG_POOL.getconn()
+            raw_conn.autocommit = False
+            return DbConnectionAdapter(raw_conn, row_factory=row_factory)
+        except Exception:
+            # Fallback to direct connect
+            connect_kwargs = {"connect_timeout": 10}
+            if "sslmode=" not in DATABASE_URL:
+                connect_kwargs["sslmode"] = "require"
+            conn = psycopg2.connect(DATABASE_URL, **connect_kwargs)
+            conn.autocommit = False
+            return DbConnectionAdapter(conn, row_factory=row_factory)
 
     conn = sqlite3.connect(DB_PATH, timeout=10)
     if row_factory:
@@ -239,6 +272,12 @@ def apply_security_headers(response):
     response.headers["Pragma"] = "no-cache"
     if IS_PRODUCTION:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    # Prometheus: count requests
+    try:
+        status = str(response.status_code)
+        REQUEST_COUNTER.labels(endpoint=request.path, method=request.method, status=status).inc()
+    except Exception:
+        pass
     return response
 
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
@@ -832,22 +871,13 @@ def healthz():
 
 @app.route('/metrics')
 def metrics():
+    # Protected metrics endpoint: allow dashboard session users or internal key
     if 'user' not in session and not request.headers.get('X-Internal-Key') == os.getenv('INTERNAL_METRICS_KEY', ''):
         return jsonify({"error": "Unauthorized"}), 401
     try:
-        conn = get_db_connection(row_factory=True); c = conn.cursor()
-        c.execute("SELECT COUNT(*) as count FROM responses")
-        total_responses = c.fetchone()['count']
-        c.execute("SELECT COUNT(*) as count FROM forms")
-        total_forms = c.fetchone()['count']
-        c.execute("SELECT COUNT(*) as count FROM forms WHERE is_active")
-        active_forms = c.fetchone()['count']
-        conn.close()
-        return jsonify({
-            "total_responses": total_responses,
-            "total_forms": total_forms,
-            "active_forms": active_forms
-        }), 200
+        # Return Prometheus text exposition
+        data = generate_latest()
+        return (data, 200, {'Content-Type': CONTENT_TYPE_LATEST})
     except Exception as e:
         app.logger.error(f"Metrics endpoint error: {str(e)}")
         return jsonify({"error": "Metrics unavailable"}), 503
@@ -1085,6 +1115,7 @@ def submit_feedback():
                 "answers": answers,
             }
             try:
+                BG_TASKS_ENQUEUED.inc()
                 analyze_response.delay(payload)
             except Exception as _ex:
                 app.logger.warning(f"Failed to enqueue analyze task: {_ex}")
