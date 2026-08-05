@@ -51,6 +51,39 @@ python app.py
 
 The app will start on the configured host/port.
 
+## Running in Production (recommended minimal stack)
+
+1. Provision Redis (used for Celery and rate-limiting):
+
+```bash
+# macOS (homebrew)
+brew install redis
+redis-server /usr/local/etc/redis.conf
+```
+
+2. Start a Celery worker (from project root):
+
+```bash
+export REDIS_URL=redis://localhost:6379/0
+celery -A celery_worker.celery worker --loglevel=info -Q default
+```
+
+3. Start Gunicorn with the provided config:
+
+```bash
+export FLASK_ENV=production
+export FLASK_SECRET_KEY="<secure-secret>"
+export ADMIN_PASSWORD="<strong-password>"
+gunicorn -c gunicorn.conf.py wsgi:app
+```
+
+4. (Optional) Run the k6 load test against your local instance:
+
+```bash
+# Install k6 (https://k6.io/docs/getting-started/installation/)
+k6 run load_test.js --env BASE_URL=http://127.0.0.1:5050
+```
+
 ## Running Tests
 
 ```bash
