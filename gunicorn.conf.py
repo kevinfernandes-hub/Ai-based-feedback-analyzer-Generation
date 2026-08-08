@@ -1,12 +1,9 @@
-import multiprocessing
 import os
 
-bind = f"0.0.0.0:{os.getenv('PORT', '5050')}"
-workers = int(os.getenv("WEB_CONCURRENCY", max(2, multiprocessing.cpu_count() // 2)))
-threads = int(os.getenv("GUNICORN_THREADS", "2"))
-timeout = int(os.getenv("GUNICORN_TIMEOUT", "120"))
-keepalive = 5
-worker_class = "gthread"
+port = os.getenv("PORT", "5050")
+bind = f"0.0.0.0:{port}"
+workers = int(os.getenv("WEB_CONCURRENCY", "2"))
+threads = 4
+timeout = 120
 accesslog = "-"
 errorlog = "-"
-loglevel = os.getenv("GUNICORN_LOG_LEVEL", "info")
