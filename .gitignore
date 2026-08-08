@@ -5,3 +5,9 @@ instance/
 *.db
 .vscode/
 .env
+tmp_app.log
+tmp_app.pid
+.agents/
+.claude/
+.goose/
+skills-lock.json

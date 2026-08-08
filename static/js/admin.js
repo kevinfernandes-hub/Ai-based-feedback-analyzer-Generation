@@ -132,7 +132,6 @@ function renderBuilder() {
                         ${getDropdownHtml(i, 'CO', dynamicCoList, mappings)}
                         ${getDropdownHtml(i, 'PO', PO_LIST_FULL, mappings)}
                         ${getDropdownHtml(i, 'PSO', PSO_LIST_FULL, mappings)}
-                        ${getDropdownHtml(i, 'PEO', PEO_LIST_FULL, mappings)}
                     </div>
                 </div>
             </div>`;
@@ -233,4 +232,271 @@ async function loadAttainment(formId) {
 }
 
 loadForms();
-setInterval(() => { if (currentFormId) loadAttainment(currentFormId); }, 3000);
+setInterval(() => { if (currentFormId && !document.hidden) loadAttainment(currentFormId); }, 15000);
+
+// --- ACTIVITY / EVENT REPORT MODULE ---
+let currentReportData = null;
+
+async function openEventReportModal() {
+    if (!currentFormId) {
+        alert("Please select a form / event first.");
+        return;
+    }
+    const modal = document.getElementById('eventReportModal');
+    modal.classList.remove('hidden');
+    
+    // Set PDF direct download links
+    const pdfUrl = `/api/export_event_report?form_id=${currentFormId}`;
+    document.getElementById('directDownloadPdfBtn').href = pdfUrl;
+    document.getElementById('previewDownloadPdfLink').href = pdfUrl;
+    
+    await loadEventReport(currentFormId);
+    switchReportTab('edit');
+}
+
+function closeEventReportModal() {
+    document.getElementById('eventReportModal').classList.add('hidden');
+}
+
+function switchReportTab(tab) {
+    const editTab = document.getElementById('reportEditTab');
+    const prevTab = document.getElementById('reportPreviewTab');
+    const editBtn = document.getElementById('reportTabEditBtn');
+    const prevBtn = document.getElementById('reportTabPreviewBtn');
+    
+    if (tab === 'preview') {
+        syncEditorToPreview();
+        editTab.classList.add('hidden');
+        prevTab.classList.remove('hidden');
+        editBtn.className = "px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition";
+        prevBtn.className = "px-3.5 py-1.5 rounded-lg bg-white text-slate-900 shadow-sm transition";
+    } else {
+        prevTab.classList.add('hidden');
+        editTab.classList.remove('hidden');
+        editBtn.className = "px-3.5 py-1.5 rounded-lg bg-white text-slate-900 shadow-sm transition";
+        prevBtn.className = "px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition";
+    }
+}
+
+async function loadEventReport(formId) {
+    try {
+        const res = await fetch(`/api/event_report?form_id=${formId}&t=${Date.now()}`);
+        if (!res.ok) throw new Error("Failed to load report");
+        const data = await res.json();
+        currentReportData = data;
+        
+        // Populate inputs
+        document.getElementById('rep_session_year').value = data.session_year || '2025-26';
+        document.getElementById('rep_event_title').value = data.event_title || '';
+        document.getElementById('rep_objective').value = data.objective || '';
+        document.getElementById('rep_event_type').value = data.event_type || '';
+        document.getElementById('rep_event_date').value = data.event_date || '';
+        document.getElementById('rep_duration').value = data.duration || '';
+        document.getElementById('rep_venue').value = data.venue || '';
+        document.getElementById('rep_faculty_coordinators').value = data.faculty_coordinators || '';
+        document.getElementById('rep_student_coordinators').value = data.student_coordinators || '';
+        document.getElementById('rep_target_students').value = data.target_students || '';
+        document.getElementById('rep_po_mapping').value = data.po_mapping || '1, 2, 3, 4, 5, 8, 12';
+        document.getElementById('rep_pso_mapping').value = data.pso_mapping || '1, 2, 3';
+        document.getElementById('rep_co_mapping').value = data.co_mapping || 'CO1, CO2, CO3, CO4';
+        document.getElementById('rep_brief_description').value = data.brief_description || '';
+        document.getElementById('rep_dignitaries_sponsors').value = data.dignitaries_sponsors || '';
+        document.getElementById('rep_winners_highlights').value = data.winners_highlights || '';
+        document.getElementById('rep_conclusion').value = data.conclusion || '';
+        
+        syncEditorToPreview();
+    } catch(e) {
+        console.error("Error loading event report:", e);
+    }
+}
+
+function syncEditorToPreview() {
+    const session_year = document.getElementById('rep_session_year').value || '2025-26';
+    const title = document.getElementById('rep_event_title').value || 'Activity Title';
+    const objective = document.getElementById('rep_objective').value || '';
+    const event_type = document.getElementById('rep_event_type').value || '';
+    const event_date = document.getElementById('rep_event_date').value || '';
+    const duration = document.getElementById('rep_duration').value || '';
+    const venue = document.getElementById('rep_venue').value || '';
+    const faculty_coordinators = document.getElementById('rep_faculty_coordinators').value || '';
+    const student_coordinators = document.getElementById('rep_student_coordinators').value || '';
+    const target_students = document.getElementById('rep_target_students').value || '';
+    const po_mapping = document.getElementById('rep_po_mapping').value || '';
+    const pso_mapping = document.getElementById('rep_pso_mapping').value || '';
+    const brief_desc = document.getElementById('rep_brief_description').value || '';
+    const dignitaries = document.getElementById('rep_dignitaries_sponsors').value || '';
+    const winners = document.getElementById('rep_winners_highlights').value || '';
+    const conclusion = document.getElementById('rep_conclusion').value || '';
+    
+    document.getElementById('prev_session_year').innerText = session_year;
+    document.getElementById('prev_event_title').innerText = title;
+    document.getElementById('prev_objective').innerText = objective;
+    document.getElementById('prev_event_type').innerText = event_type;
+    document.getElementById('prev_event_date').innerText = event_date;
+    document.getElementById('prev_duration').innerText = duration;
+    document.getElementById('prev_venue').innerText = venue;
+    document.getElementById('prev_faculty_coordinators').innerText = faculty_coordinators;
+    document.getElementById('prev_student_coordinators').innerText = student_coordinators;
+    document.getElementById('prev_target_students').innerText = target_students;
+    document.getElementById('prev_po_mapping').innerText = po_mapping;
+    document.getElementById('prev_pso_mapping').innerText = pso_mapping;
+    
+    // Format bullet points
+    const formatBullets = (rawText) => {
+        if (!rawText || !rawText.trim()) return '<span class="text-slate-400 italic">No details added.</span>';
+        const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+        return lines.map(line => {
+            if (line.startsWith('○') || line.startsWith('o ') || line.startsWith('  ○')) {
+                const clean = line.replace(/^[○o\s]+/, '');
+                return `<div class="flex items-start gap-2 pl-4 text-slate-700"><span class="text-slate-400 font-bold">○</span><span>${clean}</span></div>`;
+            } else if (line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) {
+                const clean = line.replace(/^[•\-\*\s]+/, '');
+                return `<div class="flex items-start gap-2 text-slate-800"><span class="text-blue-700 font-bold">&bull;</span><span>${clean}</span></div>`;
+            } else {
+                return `<div class="text-slate-800 my-0.5">${line}</div>`;
+            }
+        }).join('');
+    };
+    
+    document.getElementById('prev_brief_description').innerHTML = formatBullets(brief_desc);
+    
+    const digBox = document.getElementById('prev_dignitaries_box');
+    if (!dignitaries.trim()) {
+        digBox.classList.add('hidden');
+    } else {
+        digBox.classList.remove('hidden');
+        document.getElementById('prev_dignitaries_sponsors').innerHTML = formatBullets(dignitaries);
+    }
+
+    const winBox = document.getElementById('prev_winners_box');
+    if (!winners.trim()) {
+        winBox.classList.add('hidden');
+    } else {
+        winBox.classList.remove('hidden');
+        document.getElementById('prev_winners_highlights').innerHTML = formatBullets(winners);
+    }
+    
+    document.getElementById('prev_conclusion').innerText = conclusion || 'Event concluded successfully.';
+}
+
+async function aiAutoDraftEventReport() {
+    if (!currentFormId) return;
+    const btn = document.getElementById('aiDraftReportBtn');
+    const origHtml = btn.innerHTML;
+    btn.innerHTML = `<span class="animate-spin inline-block mr-1.5"><i class="ph-bold ph-spinner"></i></span> Generating with Gemini...`;
+    btn.disabled = true;
+    
+    try {
+        const res = await fetch('/api/ai/generate_event_report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ form_id: currentFormId })
+        });
+        const jsonRes = await res.json();
+        if (jsonRes.report) {
+            const data = jsonRes.report;
+            if (data.session_year) document.getElementById('rep_session_year').value = data.session_year;
+            if (data.event_title) document.getElementById('rep_event_title').value = data.event_title;
+            if (data.objective) document.getElementById('rep_objective').value = data.objective;
+            if (data.event_type) document.getElementById('rep_event_type').value = data.event_type;
+            if (data.event_date) document.getElementById('rep_event_date').value = data.event_date;
+            if (data.duration) document.getElementById('rep_duration').value = data.duration;
+            if (data.venue) document.getElementById('rep_venue').value = data.venue;
+            if (data.faculty_coordinators) document.getElementById('rep_faculty_coordinators').value = data.faculty_coordinators;
+            if (data.student_coordinators) document.getElementById('rep_student_coordinators').value = data.student_coordinators;
+            if (data.target_students) document.getElementById('rep_target_students').value = data.target_students;
+            if (data.po_mapping) document.getElementById('rep_po_mapping').value = data.po_mapping;
+            if (data.pso_mapping) document.getElementById('rep_pso_mapping').value = data.pso_mapping;
+            if (data.co_mapping) document.getElementById('rep_co_mapping').value = data.co_mapping;
+            if (data.brief_description) document.getElementById('rep_brief_description').value = data.brief_description;
+            if (data.dignitaries_sponsors) document.getElementById('rep_dignitaries_sponsors').value = data.dignitaries_sponsors;
+            if (data.winners_highlights) document.getElementById('rep_winners_highlights').value = data.winners_highlights;
+            if (data.conclusion) document.getElementById('rep_conclusion').value = data.conclusion;
+            
+            syncEditorToPreview();
+            
+            // Auto save AI draft
+            await saveEventReportData(true);
+            
+            // Switch to preview to show the user the result
+            switchReportTab('preview');
+        }
+    } catch(e) {
+        console.error("AI auto draft error:", e);
+        alert("Failed to auto-draft with AI. Loaded standard template defaults.");
+    } finally {
+        btn.innerHTML = origHtml;
+        btn.disabled = false;
+    }
+}
+
+async function saveEventReportData(silent = false) {
+    if (!currentFormId) return;
+    
+    const payload = {
+        form_id: currentFormId,
+        session_year: document.getElementById('rep_session_year').value,
+        event_title: document.getElementById('rep_event_title').value,
+        objective: document.getElementById('rep_objective').value,
+        event_type: document.getElementById('rep_event_type').value,
+        event_date: document.getElementById('rep_event_date').value,
+        duration: document.getElementById('rep_duration').value,
+        venue: document.getElementById('rep_venue').value,
+        faculty_coordinators: document.getElementById('rep_faculty_coordinators').value,
+        student_coordinators: document.getElementById('rep_student_coordinators').value,
+        target_students: document.getElementById('rep_target_students').value,
+        po_mapping: document.getElementById('rep_po_mapping').value,
+        pso_mapping: document.getElementById('rep_pso_mapping').value,
+        co_mapping: document.getElementById('rep_co_mapping').value,
+        brief_description: document.getElementById('rep_brief_description').value,
+        dignitaries_sponsors: document.getElementById('rep_dignitaries_sponsors').value,
+        winners_highlights: document.getElementById('rep_winners_highlights').value,
+        conclusion: document.getElementById('rep_conclusion').value
+    };
+    
+    try {
+        const res = await fetch('/api/save_event_report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+            syncEditorToPreview();
+            if (!silent) {
+                alert("Activity/Event Report saved successfully!");
+            }
+        }
+    } catch(e) {
+        console.error("Save error:", e);
+        if (!silent) alert("Failed to save report.");
+    }
+}
+
+function printEventReportDoc() {
+    const printContent = document.getElementById('printableReportDocument').innerHTML;
+    const printWindow = window.open('', '_blank', 'width=900,height=800');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Activity/Event Report - SVPCET</title>
+            <script src="https://cdn.tailwindcss.com"></script>
+            <style>
+                @media print {
+                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 0; margin: 0; }
+                    @page { margin: 12mm; size: A4; }
+                }
+            </style>
+        </head>
+        <body class="bg-white p-6">
+            <div class="max-w-4xl mx-auto border-0">
+                ${printContent}
+            </div>
+            <script>
+                setTimeout(() => { window.print(); window.close(); }, 500);
+            </script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}

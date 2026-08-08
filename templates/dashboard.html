@@ -12,6 +12,30 @@
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        
+        @media print {
+            body * {
+                visibility: hidden !important;
+            }
+            #eventReportModal, #eventReportModal * {
+                visibility: visible !important;
+            }
+            #printableReportDocument, #printableReportDocument * {
+                visibility: visible !important;
+            }
+            #printableReportDocument {
+                position: fixed !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 8mm !important;
+                border: none !important;
+                box-shadow: none !important;
+                z-index: 999999 !important;
+                background: white !important;
+            }
+        }
     </style>
 </head>
 <body class="saas-bg h-screen flex overflow-hidden">
@@ -48,9 +72,9 @@
                     <button id="copyFormLinkBtn" onclick="copyFormLink(event, currentFormId)" class="px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-bold rounded-lg hover:bg-emerald-100 transition shadow-sm flex items-center gap-2"><i class="ph-bold ph-link"></i> Copy Link</button>
                     <button id="qrFormLinkBtn" onclick="showFormQr(event, currentFormId)" class="px-4 py-2 bg-cyan-50 text-cyan-700 border border-cyan-200 text-sm font-bold rounded-lg hover:bg-cyan-100 transition shadow-sm flex items-center gap-2"><i class="ph-bold ph-qr-code"></i> QR</button>
                     
-                    <div class="w-px h-6 bg-slate-200 mx-1"></div>
+                    <button onclick="openEventReportModal()" class="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-bold rounded-lg hover:from-blue-700 hover:to-indigo-700 transition flex items-center gap-2 shadow-sm"><i class="ph-bold ph-file-text"></i> Event Report</button>
                     <button onclick="generateAIReport()" class="px-4 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 transition flex items-center gap-2 shadow-sm"><i class="ph-fill ph-sparkle"></i> AI Insights</button>
-                    <a id="downloadPdfBtn" href="#" class="px-4 py-2 bg-red-50 text-red-600 border border-red-100 text-sm font-bold rounded-lg hover:bg-red-100 transition shadow-sm flex items-center gap-2"><i class="ph-bold ph-file-pdf"></i> PDF</a>
+                    <a id="downloadPdfBtn" href="#" class="px-4 py-2 bg-red-50 text-red-600 border border-red-100 text-sm font-bold rounded-lg hover:bg-red-100 transition shadow-sm flex items-center gap-2"><i class="ph-bold ph-file-pdf"></i> OBE PDF</a>
                     <a id="downloadCsvBtn" href="#" class="px-4 py-2 bg-white text-slate-700 border border-slate-200 text-sm font-bold rounded-lg hover:bg-slate-50 transition shadow-sm flex items-center gap-2"><i class="ph-bold ph-file-csv"></i> CSV</a>
                 </div>
             </div>
@@ -127,6 +151,331 @@
     </main>
 
     <!-- AI Report Modal -->
+    <!-- Activity / Event Report Modal -->
+    <div id="eventReportModal" class="hidden fixed inset-0 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-4 z-50 transition-all">
+        <div class="bg-white border border-slate-200 rounded-3xl w-full max-w-5xl shadow-2xl relative flex flex-col max-h-[92vh] overflow-hidden animate-scale-up">
+            
+            <!-- Modal Header -->
+            <div class="px-8 py-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-extrabold text-sm shadow-sm">
+                        <i class="ph-bold ph-file-text text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+                            Activity/Event Report Generator
+                            <span class="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full uppercase tracking-wider">SVPCET Template</span>
+                        </h2>
+                        <p class="text-xs text-slate-500 font-medium">St. Vincent Pallotti College of Engineering & Technology, Nagpur &bull; Dept of CSE</p>
+                    </div>
+                </div>
+                
+                <!-- Action Controls & Tabs -->
+                <div class="flex items-center gap-3">
+                    <div class="bg-slate-200/80 p-1 rounded-xl flex text-xs font-bold">
+                        <button id="reportTabEditBtn" onclick="switchReportTab('edit')" class="px-3.5 py-1.5 rounded-lg bg-white text-slate-900 shadow-sm transition">📝 Edit Report</button>
+                        <button id="reportTabPreviewBtn" onclick="switchReportTab('preview')" class="px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition">🏛️ Document Preview</button>
+                    </div>
+                    <button onclick="closeEventReportModal()" class="text-slate-400 hover:text-slate-700 text-2xl font-bold p-1 rounded-full hover:bg-slate-200/60 transition">&times;</button>
+                </div>
+            </div>
+
+            <!-- Modal Body (Scrollable) -->
+            <div class="p-8 overflow-y-auto custom-scrollbar flex-1 bg-slate-50/50">
+                
+                <!-- TAB 1: REPORT BUILDER / EDITOR -->
+                <div id="reportEditTab" class="space-y-6">
+                    
+                    <!-- AI Assistant Banner -->
+                    <div class="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl p-5 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg shadow-blue-500/10">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="px-2 py-0.5 rounded-md bg-white/20 text-[10px] font-extrabold uppercase tracking-wider">Gemini 1.5 NLP</span>
+                                <h4 class="font-extrabold text-sm sm:text-base">Auto-Draft Report from Student Feedback</h4>
+                            </div>
+                            <p class="text-xs text-blue-100 leading-relaxed">Synthesizes objectives, descriptions, guest details, winner lists, and outcome attainments from live student responses.</p>
+                        </div>
+                        <button id="aiDraftReportBtn" onclick="aiAutoDraftEventReport()" class="px-5 py-2.5 bg-white text-blue-900 hover:bg-blue-50 rounded-xl text-xs font-black shrink-0 transition flex items-center justify-center gap-2 shadow-md hover:scale-105 active:scale-95">
+                            <i class="ph-fill ph-sparkle text-purple-600"></i>
+                            <span>✨ AI Auto-Draft Report</span>
+                        </button>
+                    </div>
+
+                    <!-- Meta Grid (Row 1) -->
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+                        <h3 class="text-xs font-extrabold text-slate-400 uppercase tracking-widest">1. Basic Event Identifiers</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="md:col-span-2 space-y-1">
+                                <label class="text-xs font-bold text-slate-700">Event Title <span class="text-rose-500">*</span></label>
+                                <input type="text" id="rep_event_title" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="e.g. Sankalp Bharat – 24 Hour National-Level Hackathon">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-700">Academic Session <span class="text-rose-500">*</span></label>
+                                <input type="text" id="rep_session_year" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="2025-26" value="2025-26">
+                            </div>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-700">Objective <span class="text-rose-500">*</span></label>
+                            <textarea id="rep_objective" rows="3" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none leading-relaxed" placeholder="To cultivate a culture of innovation, competitive programming, and technical problem solving..."></textarea>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-700">Event Type</label>
+                                <input type="text" id="rep_event_type" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="National-Level Hackathon">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-700">Date(s)</label>
+                                <input type="text" id="rep_event_date" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="17th & 18th April 2026">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-700">Duration</label>
+                                <input type="text" id="rep_duration" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="24 Hours (11:00 AM to 11:00 AM)">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Logistics & Coordinators (Row 2) -->
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+                        <h3 class="text-xs font-extrabold text-slate-400 uppercase tracking-widest">2. Venue & Coordinators</h3>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-700">Venue</label>
+                                <input type="text" id="rep_venue" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="BT-13 (Auditorium), Block B, SVPCET">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-700">Target Students</label>
+                                <input type="text" id="rep_target_students" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="Engineering Students from Colleges Across India">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-700">Faculty Coordinators</label>
+                                <input type="text" id="rep_faculty_coordinators" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="Prof. Vaibhav V. Deshpande, Prof. Kavita Meshram">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-700">Student Coordinators</label>
+                                <input type="text" id="rep_student_coordinators" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="Sayali Bambal, Sahil Shrivastav, Parth Lonkar">
+                            </div>
+                        </div>
+
+                        <!-- Outcome Mappings -->
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-700">PO Mapping</label>
+                                <input type="text" id="rep_po_mapping" class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="1, 2, 3, 4, 5, 8, 12">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-700">PSO Mapping</label>
+                                <input type="text" id="rep_pso_mapping" class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="1, 2, 3">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-700">CO Mapping</label>
+                                <input type="text" id="rep_co_mapping" class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-mono focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none" placeholder="CO1, CO2, CO3, CO4">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Narrative & Bulleted Sections (Row 3) -->
+                    <div class="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
+                        <h3 class="text-xs font-extrabold text-slate-400 uppercase tracking-widest">3. Comprehensive Description & Highlights</h3>
+                        
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-700 flex justify-between">
+                                <span>Brief Description (Bullet Points)</span>
+                                <span class="text-[11px] text-slate-400 font-normal">Use bullet symbol &bull; or -</span>
+                            </label>
+                            <textarea id="rep_brief_description" rows="5" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none leading-relaxed" placeholder="• The Zenith Forum & CSI, Department of Computer Science & Engineering...&#10;• The event received an overwhelming response with 231 teams...&#10;• The hackathon focused on solving real-world industrial problem statements..."></textarea>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-700">Dignitaries, Guests of Honor & Sponsors</label>
+                            <textarea id="rep_dignitaries_sponsors" rows="4" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none leading-relaxed" placeholder="The event was graced by the presence of:&#10;○ Mr. Kulwinder Singh, Marketing Head, Infocepts (Chief Guest)&#10;○ Mr. Vaibhav Wagh, Senior Software Developer, Everse.AI (Guest of Honor)&#10;○ Mr. Sunil Narware, CSR Head, Infocepts"></textarea>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-700">Winners, Key Highlights & Feedback Attainment</label>
+                            <textarea id="rep_winners_highlights" rows="4" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-mono focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none leading-relaxed" placeholder="Winners:&#10;• Winner: Team CoinToss (IIIT Nagpur) – Rs. 30,000&#10;• 1st Runner Up: Team Codex (IIIT Nagpur) – Rs. 20,000&#10;• 2nd Runner Up: Team Terranexus (Prof. Ram Meghe Institute) – Rs. 10,000&#10;Additionally, the winners were awarded goodies featuring a 1-year plan."></textarea>
+                        </div>
+
+                        <div class="space-y-1">
+                            <label class="text-xs font-bold text-slate-700">Conclusion</label>
+                            <textarea id="rep_conclusion" rows="3" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 outline-none leading-relaxed" placeholder="Sankalp Bharat was successfully conducted with enthusiastic participation from students across India..."></textarea>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- TAB 2: INSTITUTIONAL TEMPLATE LIVE PREVIEW -->
+                <div id="reportPreviewTab" class="hidden space-y-6">
+                    
+                    <!-- Preview Banner Actions -->
+                    <div class="flex items-center justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                        <div class="flex items-center gap-2 text-xs font-bold text-slate-700">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                            <span>Official Academic Document View (Ready for Printing & Accreditation)</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="printEventReportDoc()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5">
+                                <i class="ph-bold ph-printer"></i> Print
+                            </button>
+                            <a id="previewDownloadPdfLink" href="#" target="_blank" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow-md shadow-rose-600/20">
+                                <i class="ph-bold ph-file-pdf"></i> Download Official PDF
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Exact SVPCET Paper Document Replica -->
+                    <div id="printableReportDocument" class="bg-white p-8 sm:p-12 rounded-2xl border border-slate-300 shadow-xl max-w-4xl mx-auto text-slate-900 font-serif leading-normal">
+                        
+                        <!-- Document Header with Logo -->
+                        <div class="flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-4">
+                            <div class="w-16 h-16 shrink-0">
+                                <img src="/static/img/svpcet_logo.png" onerror="this.src='/static/img/logo.png'" alt="SVPCET" class="w-full h-full object-contain">
+                            </div>
+                            <div class="text-center flex-1 px-2">
+                                <h1 class="font-sans font-black text-xl sm:text-2xl text-[#0B3979] tracking-tight">ST. VINCENT PALLOTTI</h1>
+                                <h2 class="font-sans font-bold text-xs sm:text-sm text-[#0B3979] uppercase">College of Engineering & Technology, Nagpur</h2>
+                                <p class="font-sans font-bold text-[10px] text-[#0B3979] uppercase tracking-widest">(An Autonomous Institution)</p>
+                                <h3 class="font-sans font-extrabold text-sm sm:text-base text-[#0B3979] uppercase mt-2 tracking-wide">Department of Computer Science & Engineering</h3>
+                            </div>
+                            <div class="w-16"></div>
+                        </div>
+
+                        <!-- Section Title -->
+                        <div class="text-center mb-5 font-sans">
+                            <h2 class="text-base font-bold underline uppercase tracking-wide">Activity/Event Report</h2>
+                            <p class="text-xs font-bold text-slate-800 mt-0.5">Session: <span id="prev_session_year">2025-26</span></p>
+                        </div>
+
+                        <!-- Formal Bordered Table -->
+                        <div class="border-2 border-slate-900 text-xs font-sans">
+                            
+                            <!-- Event Title -->
+                            <div class="flex border-b border-slate-900">
+                                <div class="w-44 p-2.5 font-bold border-r border-slate-900 bg-slate-50/50">Event Title:</div>
+                                <div class="flex-1 p-2.5 font-semibold text-slate-900" id="prev_event_title"></div>
+                            </div>
+
+                            <!-- Objective -->
+                            <div class="flex border-b border-slate-900">
+                                <div class="w-44 p-2.5 font-bold border-r border-slate-900 bg-slate-50/50">Objective:</div>
+                                <div class="flex-1 p-2.5 text-slate-800 leading-relaxed text-justify" id="prev_objective"></div>
+                            </div>
+
+                            <!-- Event Type -->
+                            <div class="flex border-b border-slate-900">
+                                <div class="w-44 p-2.5 font-bold border-r border-slate-900 bg-slate-50/50">Event Type:</div>
+                                <div class="flex-1 p-2.5 text-slate-800" id="prev_event_type"></div>
+                            </div>
+
+                            <!-- Date -->
+                            <div class="flex border-b border-slate-900">
+                                <div class="w-44 p-2.5 font-bold border-r border-slate-900 bg-slate-50/50">Date:</div>
+                                <div class="flex-1 p-2.5 text-slate-800" id="prev_event_date"></div>
+                            </div>
+
+                            <!-- Duration -->
+                            <div class="flex border-b border-slate-900">
+                                <div class="w-44 p-2.5 font-bold border-r border-slate-900 bg-slate-50/50">Duration:</div>
+                                <div class="flex-1 p-2.5 text-slate-800" id="prev_duration"></div>
+                            </div>
+
+                            <!-- Venue -->
+                            <div class="flex border-b border-slate-900">
+                                <div class="w-44 p-2.5 font-bold border-r border-slate-900 bg-slate-50/50">Venue:</div>
+                                <div class="flex-1 p-2.5 text-slate-800" id="prev_venue"></div>
+                            </div>
+
+                            <!-- Faculty Coordinators -->
+                            <div class="flex border-b border-slate-900">
+                                <div class="w-44 p-2.5 font-bold border-r border-slate-900 bg-slate-50/50">Faculty Coordinators:</div>
+                                <div class="flex-1 p-2.5 text-slate-800 font-medium" id="prev_faculty_coordinators"></div>
+                            </div>
+
+                            <!-- Student Coordinators -->
+                            <div class="flex border-b border-slate-900">
+                                <div class="w-44 p-2.5 font-bold border-r border-slate-900 bg-slate-50/50">Student Coordinators:</div>
+                                <div class="flex-1 p-2.5 text-slate-800 font-medium" id="prev_student_coordinators"></div>
+                            </div>
+
+                            <!-- Target Students -->
+                            <div class="flex border-b border-slate-900">
+                                <div class="w-44 p-2.5 font-bold border-r border-slate-900 bg-slate-50/50">Target Students:</div>
+                                <div class="flex-1 p-2.5 text-slate-800" id="prev_target_students"></div>
+                            </div>
+
+                            <!-- PO & PSO Mapping Row -->
+                            <div class="flex border-b border-slate-900">
+                                <div class="w-1/2 p-2.5 font-bold border-r border-slate-900">
+                                    <span>PO Mapping: </span>
+                                    <span class="font-normal font-mono" id="prev_po_mapping"></span>
+                                </div>
+                                <div class="w-1/2 p-2.5 font-bold">
+                                    <span>PSO Mapping: </span>
+                                    <span class="font-normal font-mono" id="prev_pso_mapping"></span>
+                                </div>
+                            </div>
+
+                            <!-- Brief Description -->
+                            <div class="p-3 border-b border-slate-900 space-y-1.5">
+                                <div class="font-bold">Brief Description:</div>
+                                <div class="text-slate-800 pl-2 leading-relaxed space-y-1" id="prev_brief_description"></div>
+                            </div>
+
+                            <!-- Dignitaries / Sponsors -->
+                            <div id="prev_dignitaries_box" class="p-3 border-b border-slate-900 space-y-1.5">
+                                <div class="font-bold">Dignitaries, Guests & Industry Partners:</div>
+                                <div class="text-slate-800 pl-2 leading-relaxed space-y-1" id="prev_dignitaries_sponsors"></div>
+                            </div>
+
+                            <!-- Winners / Highlights -->
+                            <div id="prev_winners_box" class="p-3 border-b border-slate-900 space-y-1.5">
+                                <div class="font-bold">Winners & Key Highlights:</div>
+                                <div class="text-slate-800 pl-2 leading-relaxed space-y-1" id="prev_winners_highlights"></div>
+                            </div>
+
+                            <!-- Conclusion -->
+                            <div class="p-3 space-y-1.5">
+                                <div class="font-bold">Conclusion:</div>
+                                <div class="text-slate-800 leading-relaxed text-justify" id="prev_conclusion"></div>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- Modal Footer Controls -->
+            <div class="px-8 py-4 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+                <div class="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                    <i class="ph-bold ph-shield-check text-emerald-600 text-base"></i>
+                    <span>All changes are automatically formatted into the accredited SVPCET institutional layout.</span>
+                </div>
+                
+                <div class="flex items-center gap-3 w-full sm:w-auto">
+                    <button onclick="saveEventReportData()" class="flex-1 sm:flex-none px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shadow-md">
+                        <i class="ph-bold ph-floppy-disk"></i>
+                        <span>Save Report</span>
+                    </button>
+                    <a id="directDownloadPdfBtn" href="#" target="_blank" class="flex-1 sm:flex-none px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 shadow-lg shadow-blue-600/20">
+                        <i class="ph-bold ph-file-pdf text-base"></i>
+                        <span>Download Official PDF</span>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- AI Insights Modal -->
     <div id="aiModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
         <div class="bg-white border border-slate-200 rounded-2xl p-8 max-w-2xl w-full shadow-2xl relative max-h-[80vh] overflow-y-auto custom-scrollbar">
             <button onclick="document.getElementById('aiModal').classList.add('hidden')" class="absolute top-6 right-6 text-slate-400 hover:text-slate-600 text-2xl">&times;</button>
@@ -606,7 +955,6 @@
                                 ${getDropdownHtml(i, 'CO', courseCOs, mappings)}
                                 ${getDropdownHtml(i, 'PO', PO_LIST_FULL, mappings)}
                                 ${getDropdownHtml(i, 'PSO', PSO_LIST_FULL, mappings)}
-                                ${getDropdownHtml(i, 'PEO', PEO_LIST_FULL, mappings)}
                             </div>
                         </div>
                     </div>`;
@@ -962,6 +1310,271 @@
                 }
 
             } catch(e) { console.error("Error fetching data:", e); }
+        }
+
+        // --- ACTIVITY / EVENT REPORT MODULE ---
+        window.openEventReportModal = async function() {
+            if (!currentFormId) {
+                if (allAdminForms && allAdminForms.length > 0) {
+                    selectForm(allAdminForms[0].id);
+                } else {
+                    alert("Please select a form / event first.");
+                    return;
+                }
+            }
+            const modal = document.getElementById('eventReportModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+            }
+            
+            const pdfUrl = `/api/export_event_report?form_id=${currentFormId}`;
+            const dirBtn = document.getElementById('directDownloadPdfBtn');
+            const prevLink = document.getElementById('previewDownloadPdfLink');
+            if (dirBtn) dirBtn.href = pdfUrl;
+            if (prevLink) prevLink.href = pdfUrl;
+            
+            await window.loadEventReport(currentFormId);
+            window.switchReportTab('edit');
+        };
+
+        window.closeEventReportModal = function() {
+            const modal = document.getElementById('eventReportModal');
+            if (modal) modal.classList.add('hidden');
+        };
+
+        window.switchReportTab = function(tab) {
+            const editTab = document.getElementById('reportEditTab');
+            const prevTab = document.getElementById('reportPreviewTab');
+            const editBtn = document.getElementById('reportTabEditBtn');
+            const prevBtn = document.getElementById('reportTabPreviewBtn');
+            if (!editTab || !prevTab) return;
+            
+            if (tab === 'preview') {
+                window.syncEditorToPreview();
+                editTab.classList.add('hidden');
+                prevTab.classList.remove('hidden');
+                if (editBtn) editBtn.className = "px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition";
+                if (prevBtn) prevBtn.className = "px-3.5 py-1.5 rounded-lg bg-white text-slate-900 shadow-sm transition";
+            } else {
+                prevTab.classList.add('hidden');
+                editTab.classList.remove('hidden');
+                if (editBtn) editBtn.className = "px-3.5 py-1.5 rounded-lg bg-white text-slate-900 shadow-sm transition";
+                if (prevBtn) prevBtn.className = "px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition";
+            }
+        };
+
+        window.loadEventReport = async function(formId) {
+            if (!formId) return;
+            try {
+                const res = await fetch(`/api/event_report?form_id=${formId}&t=${Date.now()}`);
+                if (!res.ok) throw new Error("Failed to load report");
+                const data = await res.json();
+                
+                const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+                setVal('rep_session_year', data.session_year || '2025-26');
+                setVal('rep_event_title', data.event_title || '');
+                setVal('rep_objective', data.objective || '');
+                setVal('rep_event_type', data.event_type || '');
+                setVal('rep_event_date', data.event_date || '');
+                setVal('rep_duration', data.duration || '');
+                setVal('rep_venue', data.venue || '');
+                setVal('rep_faculty_coordinators', data.faculty_coordinators || '');
+                setVal('rep_student_coordinators', data.student_coordinators || '');
+                setVal('rep_target_students', data.target_students || '');
+                setVal('rep_po_mapping', data.po_mapping || '1, 2, 3, 4, 5, 8, 12');
+                setVal('rep_pso_mapping', data.pso_mapping || '1, 2, 3');
+                setVal('rep_co_mapping', data.co_mapping || 'CO1, CO2, CO3, CO4');
+                setVal('rep_brief_description', data.brief_description || '');
+                setVal('rep_dignitaries_sponsors', data.dignitaries_sponsors || '');
+                setVal('rep_winners_highlights', data.winners_highlights || '');
+                setVal('rep_conclusion', data.conclusion || '');
+                
+                window.syncEditorToPreview();
+            } catch(e) {
+                console.error("Error loading event report:", e);
+            }
+        };
+
+        window.syncEditorToPreview = function() {
+            const getVal = (id, def = '') => { const el = document.getElementById(id); return el ? (el.value || def) : def; };
+            const setText = (id, text) => { const el = document.getElementById(id); if (el) el.innerText = text; };
+            
+            setText('prev_session_year', getVal('rep_session_year', '2025-26'));
+            setText('prev_event_title', getVal('rep_event_title', 'Activity Title'));
+            setText('prev_objective', getVal('rep_objective', ''));
+            setText('prev_event_type', getVal('rep_event_type', ''));
+            setText('prev_event_date', getVal('rep_event_date', ''));
+            setText('prev_duration', getVal('rep_duration', ''));
+            setText('prev_venue', getVal('rep_venue', ''));
+            setText('prev_faculty_coordinators', getVal('rep_faculty_coordinators', ''));
+            setText('prev_student_coordinators', getVal('rep_student_coordinators', ''));
+            setText('prev_target_students', getVal('rep_target_students', ''));
+            setText('prev_po_mapping', getVal('rep_po_mapping', ''));
+            setText('prev_pso_mapping', getVal('rep_pso_mapping', ''));
+            
+            const formatBullets = (rawText) => {
+                if (!rawText || !rawText.trim()) return '<span class="text-slate-400 italic">No details added.</span>';
+                const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                return lines.map(line => {
+                    if (line.startsWith('○') || line.startsWith('o ') || line.startsWith('  ○')) {
+                        const clean = line.replace(/^[○o\s]+/, '');
+                        return `<div class="flex items-start gap-2 pl-4 text-slate-700"><span class="text-slate-400 font-bold">○</span><span>${clean}</span></div>`;
+                    } else if (line.startsWith('•') || line.startsWith('-') || line.startsWith('*')) {
+                        const clean = line.replace(/^[•\-\*\s]+/, '');
+                        return `<div class="flex items-start gap-2 text-slate-800"><span class="text-blue-700 font-bold">&bull;</span><span>${clean}</span></div>`;
+                    } else {
+                        return `<div class="text-slate-800 my-0.5">${line}</div>`;
+                    }
+                }).join('');
+            };
+            
+            const isBlankField = (val) => {
+                if (!val) return true;
+                const s = String(val).trim().toLowerCase();
+                return s === '' || s === '-' || s === '--' || s === '---' || s === 'n/a' || s === 'na' || s === 'none' || s === 'nil' || s === 'null' || s === 'no' || s === '?';
+            };
+            
+            const prevBrief = document.getElementById('prev_brief_description');
+            if (prevBrief) prevBrief.innerHTML = formatBullets(getVal('rep_brief_description'));
+            
+            const digText = getVal('rep_dignitaries_sponsors');
+            const digBox = document.getElementById('prev_dignitaries_box');
+            if (digBox) {
+                if (isBlankField(digText)) {
+                    digBox.classList.add('hidden');
+                } else {
+                    digBox.classList.remove('hidden');
+                    const digEl = document.getElementById('prev_dignitaries_sponsors');
+                    if (digEl) digEl.innerHTML = formatBullets(digText);
+                }
+            }
+
+            const winText = getVal('rep_winners_highlights');
+            const winBox = document.getElementById('prev_winners_box');
+            if (winBox) {
+                if (isBlankField(winText)) {
+                    winBox.classList.add('hidden');
+                } else {
+                    winBox.classList.remove('hidden');
+                    const winEl = document.getElementById('prev_winners_highlights');
+                    if (winEl) winEl.innerHTML = formatBullets(winText);
+                }
+            }
+            
+            setText('prev_conclusion', getVal('rep_conclusion', 'Event concluded successfully.'));
+        };
+
+        window.aiAutoDraftEventReport = async function() {
+            if (!currentFormId) return;
+            const btn = document.getElementById('aiDraftReportBtn');
+            const origHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.innerHTML = `<span class="animate-spin inline-block mr-1.5"><i class="ph-bold ph-spinner"></i></span> Generating with Gemini...`;
+                btn.disabled = true;
+            }
+            
+            try {
+                const res = await fetch('/api/ai/generate_event_report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ form_id: currentFormId })
+                });
+                const jsonRes = await res.json();
+                if (jsonRes.report) {
+                    const data = jsonRes.report;
+                    const setVal = (id, val) => { const el = document.getElementById(id); if (el && val) el.value = val; };
+                    setVal('rep_session_year', data.session_year);
+                    setVal('rep_event_title', data.event_title);
+                    setVal('rep_objective', data.objective);
+                    setVal('rep_event_type', data.event_type);
+                    setVal('rep_event_date', data.event_date);
+                    setVal('rep_duration', data.duration);
+                    setVal('rep_venue', data.venue);
+                    setVal('rep_faculty_coordinators', data.faculty_coordinators);
+                    setVal('rep_student_coordinators', data.student_coordinators);
+                    setVal('rep_target_students', data.target_students);
+                    setVal('rep_po_mapping', data.po_mapping);
+                    setVal('rep_pso_mapping', data.pso_mapping);
+                    setVal('rep_co_mapping', data.co_mapping);
+                    setVal('rep_brief_description', data.brief_description);
+                    setVal('rep_dignitaries_sponsors', data.dignitaries_sponsors);
+                    setVal('rep_winners_highlights', data.winners_highlights);
+                    setVal('rep_conclusion', data.conclusion);
+                    
+                    window.syncEditorToPreview();
+                    await window.saveEventReportData(true);
+                    window.switchReportTab('preview');
+                }
+            } catch(e) {
+                console.error("AI auto draft error:", e);
+                alert("Failed to auto-draft with AI. Loaded standard template defaults.");
+            } finally {
+                if (btn) {
+                    btn.innerHTML = origHtml;
+                    btn.disabled = false;
+                }
+            }
+        };
+
+        window.saveEventReportData = async function(silent = false) {
+            if (!currentFormId) return;
+            const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+            const payload = {
+                form_id: currentFormId,
+                session_year: getVal('rep_session_year'),
+                event_title: getVal('rep_event_title'),
+                objective: getVal('rep_objective'),
+                event_type: getVal('rep_event_type'),
+                event_date: getVal('rep_event_date'),
+                duration: getVal('rep_duration'),
+                venue: getVal('rep_venue'),
+                faculty_coordinators: getVal('rep_faculty_coordinators'),
+                student_coordinators: getVal('rep_student_coordinators'),
+                target_students: getVal('rep_target_students'),
+                po_mapping: getVal('rep_po_mapping'),
+                pso_mapping: getVal('rep_pso_mapping'),
+                co_mapping: getVal('rep_co_mapping'),
+                brief_description: getVal('rep_brief_description'),
+                dignitaries_sponsors: getVal('rep_dignitaries_sponsors'),
+                winners_highlights: getVal('rep_winners_highlights'),
+                conclusion: getVal('rep_conclusion')
+            };
+            
+            try {
+                const res = await fetch('/api/save_event_report', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) {
+                    window.syncEditorToPreview();
+                    if (!silent) alert("Activity/Event Report saved successfully!");
+                }
+            } catch(e) {
+                console.error("Save error:", e);
+                if (!silent) alert("Failed to save report.");
+            }
+        };
+
+        window.printEventReportDoc = function() {
+            window.switchReportTab('preview');
+            setTimeout(() => {
+                window.print();
+            }, 200);
+        };
+
+        // Auto select first form when list loads
+        const originalLoadForms = loadForms;
+        loadForms = async function() {
+            await originalLoadForms();
+            if (!currentFormId && allAdminForms && allAdminForms.length > 0) {
+                selectForm(allAdminForms[0].id);
+            }
+        };
+
+        const repTab = document.getElementById('reportEditTab');
+        if (repTab) {
+            repTab.addEventListener('input', () => { window.syncEditorToPreview(); });
         }
 
         loadForms();

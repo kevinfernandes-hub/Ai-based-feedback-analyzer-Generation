@@ -2,42 +2,199 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>CampusVoice</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusVoice | AI Feedback Analyzer</title>
+    
+    <!-- Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+                        display: ['Outfit', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .grid-bg {
+            background-color: #ffffff;
+            background-image: 
+                linear-gradient(to right, #f1f5f9 1px, transparent 1px),
+                linear-gradient(to bottom, #f1f5f9 1px, transparent 1px);
+            background-size: 4rem 4rem;
+        }
+        .hero-glow {
+            background: radial-gradient(circle 600px at 50% 150px, #dbeafe 0%, rgba(241, 245, 249, 0.4) 60%, transparent 100%);
+        }
+        .card-interactive {
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .card-interactive:hover {
+            transform: translateY(-6px);
+        }
+    </style>
 </head>
-<body class="bg-white text-slate-900 font-sans overflow-x-hidden selection:bg-blue-100">
-    <div class="fixed inset-0 -z-10 h-full w-full bg-white bg-[linear-gradient(to_right,#f0f0f0_1px,transparent_1px),linear-gradient(to_bottom,#f0f0f0_1px,transparent_1px)] bg-[size:6rem_4rem]">
-        <div class="absolute bottom-0 left-0 right-0 top-0 bg-[radial-gradient(circle_500px_at_50%_200px,#C9EBFF,transparent)]"></div>
-    </div>
-    <nav class="w-full py-6 px-6 md:px-12 flex justify-between items-center max-w-7xl mx-auto">
+<body class="grid-bg text-slate-900 font-sans antialiased min-h-screen flex flex-col justify-between selection:bg-blue-600 selection:text-white relative overflow-x-hidden">
+
+    <!-- Ambient Radial Glow -->
+    <div class="fixed inset-0 pointer-events-none hero-glow -z-10"></div>
+
+    <!-- Top Navigation -->
+    <header class="w-full max-w-7xl mx-auto px-6 sm:px-12 py-6 flex items-center justify-between">
+        <a href="/" class="flex items-center gap-3.5 group">
+            <div class="w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-sm p-1.5 flex items-center justify-center group-hover:scale-105 transition-transform">
+                <img src="{{ brand.logo_url if brand and brand.logo_url else url_for('static', filename='img/logo.png') }}" 
+                     alt="Logo" 
+                     class="w-full h-full object-contain"
+                     onerror="this.onerror=null; this.parentElement.innerHTML='<span class=\'font-black text-sm text-blue-600\'>CV</span>'">
+            </div>
+            <div>
+                <span class="font-display font-extrabold text-xl tracking-tight text-slate-900">CampusVoice</span>
+                <p class="text-[11px] font-medium text-slate-500 hidden sm:block">
+                    {{ brand.college_name if brand and brand.college_name else 'Department of Computer Science and Engineering' }}
+                </p>
+            </div>
+        </a>
+
         <div class="flex items-center gap-3">
-            <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo" class="w-10 h-10 rounded-lg object-contain shadow-sm border border-slate-100" onerror="this.style.display='none'">
-            <span class="font-bold text-xl tracking-tight">CampusVoice</span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-700 text-xs font-bold">
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></span>
+                AI Active
+            </span>
         </div>
-    </nav>
-    <main class="max-w-7xl mx-auto px-6 md:px-12 pt-12 md:pt-20 pb-20 flex flex-col md:flex-row items-center gap-16">
-        <div class="flex-1 text-center md:text-left space-y-8 animate-fade-in-up">
-            <h1 class="text-5xl md:text-7xl font-extrabold leading-[1.1] tracking-tight text-slate-900">Student Feedback <br> <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Made Intelligent.</span></h1>
-            <p class="text-lg text-slate-600 leading-relaxed max-w-lg mx-auto md:mx-0">Collect anonymous insights, analyze sentiments, and make data-driven decisions.</p>
-            <div class="flex flex-col sm:flex-row gap-4 justify-center md:justify-start">
-                <a href="/student" class="px-8 py-4 bg-slate-900 text-white rounded-xl font-semibold shadow-xl shadow-slate-900/20 hover:bg-slate-800 hover:-translate-y-1 transition-all flex items-center justify-center gap-2">Start Feedback <i class="ph-bold ph-arrow-right"></i></a>
-                <a href="/login" class="px-8 py-4 bg-white text-slate-700 border border-slate-200 rounded-xl font-semibold hover:bg-slate-50 hover:border-slate-300 transition-all">Admin Login</a>
+    </header>
+
+    <!-- Main Split Hero Section -->
+    <main class="w-full max-w-7xl mx-auto px-6 sm:px-12 py-8 sm:py-16 my-auto">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+            
+            <!-- Left Column: Big Bold Typography & Action Buttons -->
+            <div class="lg:col-span-7 space-y-8 text-left">
+                
+                <!-- Main Impact Heading -->
+                <h1 class="font-display text-5xl sm:text-7xl xl:text-8xl font-black tracking-tight text-slate-900 leading-[1.04]">
+                    Student <br>
+                    Feedback <br>
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600">
+                        Made <br class="hidden sm:inline">Intelligent.
+                    </span>
+                </h1>
+
+                <!-- Subtitle -->
+                <p class="text-lg sm:text-xl text-slate-600 max-w-xl leading-relaxed font-normal">
+                    Collect anonymous insights, analyze sentiments with AI, and make data-driven decisions for academic excellence.
+                </p>
+
+                <!-- Dual Bottom Action Buttons -->
+                <div class="flex flex-wrap gap-4 pt-2">
+                    <a href="/student" 
+                       class="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-bold text-base shadow-xl shadow-slate-900/20 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2.5">
+                        <span>Start Feedback</span>
+                        <svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </a>
+
+                    <a href="/login" 
+                       class="px-8 py-4 bg-white hover:bg-slate-50 text-slate-800 rounded-2xl font-bold text-base border border-slate-200 shadow-sm hover:border-slate-300 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 flex items-center justify-center gap-2.5">
+                        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                        <span>Admin Login</span>
+                    </a>
+                </div>
+
+                <!-- Trust Micro-Badges -->
+                <div class="pt-4 flex flex-wrap items-center gap-6 text-xs font-semibold text-slate-500">
+                    <span class="flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                        100% Anonymous
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        Gemini & Groq NLP
+                    </span>
+                    <span class="flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        CO/PO Attainment
+                    </span>
+                </div>
+
             </div>
-        </div>
-        <div id="portals" class="flex-1 w-full max-w-md relative group">
-            <div class="absolute -top-12 -right-12 w-64 h-64 bg-purple-500/30 rounded-full blur-3xl opacity-50 animate-pulse"></div>
-            <div class="absolute -bottom-12 -left-12 w-64 h-64 bg-blue-500/30 rounded-full blur-3xl opacity-50 animate-pulse delay-700"></div>
-            <div class="relative flex flex-col gap-6">
-                <a href="/student" class="group/card relative bg-white/80 backdrop-blur-xl p-8 rounded-3xl border border-white shadow-2xl shadow-slate-200/50 hover:shadow-blue-500/10 hover:border-blue-200 hover:-translate-y-2 transition-all duration-300 overflow-hidden cursor-pointer">
-                    <div class="relative z-10"><div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 group-hover/card:bg-blue-600 transition-colors duration-300"><i class="ph-duotone ph-student text-2xl text-blue-600 group-hover/card:text-white transition-colors"></i></div><h3 class="text-2xl font-bold text-slate-900 mb-2">Student Portal</h3><p class="text-slate-500 mb-6">Submit feedback anonymously.</p><span class="text-sm font-bold text-blue-600 flex items-center gap-2">Enter Portal <i class="ph-bold ph-arrow-right"></i></span></div>
+
+            <!-- Right Column: 2 Stacked Premium Cards (Light & Dark) -->
+            <div class="lg:col-span-5 w-full max-w-lg mx-auto space-y-6">
+                
+                <!-- Card 1: Student Portal (Light Floating Card) -->
+                <a href="/student" 
+                   class="card-interactive block bg-white/95 backdrop-blur-xl p-8 rounded-3xl border border-slate-200/90 shadow-xl shadow-slate-200/50 hover:shadow-2xl hover:shadow-blue-500/10 hover:border-blue-300 relative group overflow-hidden cursor-pointer">
+                    <div class="flex items-start justify-between mb-6">
+                        <div class="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center group-hover:bg-blue-600 text-blue-600 group-hover:text-white transition-all duration-300 shadow-sm">
+                            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-5.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"/></svg>
+                        </div>
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                            Anonymous
+                        </span>
+                    </div>
+
+                    <h3 class="text-2xl font-display font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors mb-2">
+                        Student Portal
+                    </h3>
+                    <p class="text-sm text-slate-500 mb-6 leading-relaxed">
+                        Submit course feedback in under 60 seconds with zero personal tracking.
+                    </p>
+
+                    <div class="text-sm font-bold text-blue-600 flex items-center gap-2 group-hover:translate-x-1 transition-transform">
+                        <span>Enter Portal</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </div>
                 </a>
-                <a href="/login" class="group/card relative bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-2xl shadow-slate-900/20 hover:shadow-purple-500/10 hover:border-purple-200 hover:-translate-y-2 transition-all duration-300 overflow-hidden cursor-pointer">
-                    <div class="relative z-10"><div class="w-14 h-14 bg-purple-50 rounded-2xl flex items-center justify-center mb-6 group-hover/card:bg-purple-600 transition-colors duration-300"><i class="ph-duotone ph-shield-check text-2xl text-purple-600 group-hover/card:text-white transition-colors"></i></div><h3 class="text-2xl font-bold text-slate-900 mb-2">Admin Portal</h3><p class="text-slate-500 mb-6">View analytics & reports.</p><span class="text-sm font-bold text-purple-600 flex items-center gap-2">Secure Login <i class="ph-bold ph-arrow-right"></i></span></div>
+
+                <!-- Card 2: Admin Dashboard (Dark Luxury Card) -->
+                <a href="/login" 
+                   class="card-interactive block bg-slate-950 p-8 rounded-3xl border border-slate-800 shadow-2xl shadow-slate-950/20 hover:shadow-purple-500/10 hover:border-slate-700 relative group overflow-hidden cursor-pointer text-white">
+                    <div class="flex items-start justify-between mb-6">
+                        <div class="w-14 h-14 bg-slate-900 rounded-2xl border border-slate-800 flex items-center justify-center group-hover:bg-gradient-to-tr group-hover:from-purple-600 group-hover:to-indigo-600 text-purple-400 group-hover:text-white transition-all duration-300 shadow-sm">
+                            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        </div>
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-purple-400 bg-purple-950/60 px-3 py-1 rounded-full border border-purple-800/60">
+                            Faculty
+                        </span>
+                    </div>
+
+                    <h3 class="text-2xl font-display font-extrabold text-white group-hover:text-purple-400 transition-colors mb-2">
+                        Admin Dashboard
+                    </h3>
+                    <p class="text-sm text-slate-400 mb-6 leading-relaxed">
+                        Access real-time sentiment distribution heatmaps, CO-PO attainment, and PDF reports.
+                    </p>
+
+                    <div class="text-sm font-bold text-purple-400 flex items-center gap-2 group-hover:translate-x-1 transition-transform">
+                        <span>Secure Login</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </div>
                 </a>
+
             </div>
+
         </div>
     </main>
+
+    <!-- Simple Bottom Footer -->
+    <footer class="w-full max-w-7xl mx-auto px-6 sm:px-12 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500 font-medium">
+        <div>
+            {{ brand.college_name if brand and brand.college_name else 'Department of Computer Science and Engineering' }}
+        </div>
+        <div class="flex items-center gap-6">
+            <a href="/student" class="hover:text-slate-900 transition">Student Form</a>
+            <a href="/login" class="hover:text-slate-900 transition">Admin Login</a>
+        </div>
+    </footer>
+
 </body>
 </html>
