@@ -76,6 +76,7 @@
                     <button onclick="generateAIReport()" class="px-4 py-2 bg-purple-600 text-white text-sm font-bold rounded-lg hover:bg-purple-700 transition flex items-center gap-2 shadow-sm"><i class="ph-fill ph-sparkle"></i> AI Insights</button>
                     <a id="downloadPdfBtn" href="#" class="px-4 py-2 bg-red-50 text-red-600 border border-red-100 text-sm font-bold rounded-lg hover:bg-red-100 transition shadow-sm flex items-center gap-2"><i class="ph-bold ph-file-pdf"></i> OBE PDF</a>
                     <a id="downloadCsvBtn" href="#" class="px-4 py-2 bg-white text-slate-700 border border-slate-200 text-sm font-bold rounded-lg hover:bg-slate-50 transition shadow-sm flex items-center gap-2"><i class="ph-bold ph-file-csv"></i> CSV</a>
+                    <button onclick="deleteForm(event, currentFormId, document.getElementById('selectedEventTitle').innerText)" class="px-3.5 py-2 bg-rose-50 text-rose-600 border border-rose-200 text-sm font-bold rounded-lg hover:bg-rose-100 transition shadow-sm flex items-center gap-1.5" title="Delete Form"><i class="ph-bold ph-trash text-base"></i> Delete</button>
                 </div>
             </div>
 
@@ -1021,7 +1022,7 @@
                     const activeClass = currentFormId === f.id ? 'border-blue-500 bg-blue-50 shadow-sm ring-1 ring-blue-500' : 'border-slate-100 bg-white hover:border-blue-200';
                     const statusClass = f.is_open ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500';
                     const statusText = f.is_open ? 'Open' : 'Closed';
-                    list.innerHTML += `<div class="p-4 rounded-xl border ${activeClass} cursor-pointer transition mb-2" onclick="selectForm(${f.id})"><div class="flex justify-between items-start gap-3"><div><span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">${f.course_name}</span><span class="font-bold text-sm text-slate-800">${f.title}</span><span class="block text-[10px] text-slate-400 mt-1">${f.start_at || '-'} to ${f.end_at || '-'}</span></div><div class="flex flex-col items-end gap-2"><div class="flex gap-1"><span class="text-[10px] px-2 py-0.5 rounded-full ${statusClass}">${statusText}</span><span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700">Published</span></div><div class="flex gap-1"><button class="text-[10px] font-bold px-2 py-1 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100" onclick="event.stopPropagation(); openEditModal(${f.id});">Edit</button><button class="text-[10px] font-bold px-2 py-1 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100" onclick="copyFormLink(event, ${f.id})">Copy</button><button class="text-[10px] font-bold px-2 py-1 rounded bg-cyan-50 border border-cyan-200 text-cyan-700 hover:bg-cyan-100" onclick="showFormQr(event, ${f.id})">QR</button></div></div></div></div>`;
+                    list.innerHTML += `<div class="p-4 rounded-xl border ${activeClass} cursor-pointer transition mb-2" onclick="selectForm(${f.id})"><div class="flex justify-between items-start gap-3"><div><span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">${f.course_name}</span><span class="font-bold text-sm text-slate-800">${f.title}</span><span class="block text-[10px] text-slate-400 mt-1">${f.start_at || '-'} to ${f.end_at || '-'}</span></div><div class="flex flex-col items-end gap-2"><div class="flex gap-1"><span class="text-[10px] px-2 py-0.5 rounded-full ${statusClass}">${statusText}</span><span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700">Published</span></div><div class="flex gap-1"><button class="text-[10px] font-bold px-2 py-1 rounded bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100" onclick="event.stopPropagation(); openEditModal(${f.id});">Edit</button><button class="text-[10px] font-bold px-2 py-1 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100" onclick="copyFormLink(event, ${f.id})">Copy</button><button class="text-[10px] font-bold px-2 py-1 rounded bg-cyan-50 border border-cyan-200 text-cyan-700 hover:bg-cyan-100" onclick="showFormQr(event, ${f.id})">QR</button><button class="text-[10px] font-bold px-2 py-1 rounded bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 transition" onclick="deleteForm(event, ${f.id}, '${f.title.replace(/'/g, "\\'")}')" title="Delete Form"><i class="ph-bold ph-trash"></i></button></div></div></div></div>`;
                 });
             } catch(e) {}
         }
@@ -1259,54 +1260,78 @@
                     if (barChartInstance) barChartInstance.destroy();
                     if (lineChartInstance) lineChartInstance.destroy();
 
-                    pieChartInstance = new Chart(document.getElementById('pieChart').getContext('2d'), {
-                        type: 'pie',
-                        data: {
-                            labels: ['High (L3)', 'Moderate (L2)', 'Low (L1)'],
-                            datasets: [{ data: data.charts.pie, backgroundColor: ['#22c55e', '#eab308', '#ef4444'] }]
-                        },
-                        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
-                    });
+                    const pieData = (data.charts.pie && Array.isArray(data.charts.pie)) ? data.charts.pie : [0, 0, 0];
+                    const pieEl = document.getElementById('pieChart');
+                    if (pieEl) {
+                        pieChartInstance = new Chart(pieEl.getContext('2d'), {
+                            type: 'pie',
+                            data: {
+                                labels: ['High (L3)', 'Moderate (L2)', 'Low (L1)'],
+                                datasets: [{ data: pieData, backgroundColor: ['#22c55e', '#eab308', '#ef4444'] }]
+                            },
+                            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+                        });
+                    }
 
-                    barChartInstance = new Chart(document.getElementById('barChart').getContext('2d'), {
-                        type: 'bar',
-                        data: {
-                            labels: data.charts.bar.labels,
-                            datasets: [{ label: 'Attainment %', data: data.charts.bar.data, backgroundColor: '#3b82f6', borderRadius: 4 }]
-                        },
-                        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
-                    });
+                    const barLabels = (data.charts.bar && Array.isArray(data.charts.bar.labels)) ? data.charts.bar.labels : [];
+                    const barValues = (data.charts.bar && Array.isArray(data.charts.bar.data)) ? data.charts.bar.data : [];
+                    const barEl = document.getElementById('barChart');
+                    if (barEl) {
+                        barChartInstance = new Chart(barEl.getContext('2d'), {
+                            type: 'bar',
+                            data: {
+                                labels: barLabels,
+                                datasets: [{ label: 'Attainment %', data: barValues, backgroundColor: '#3b82f6', borderRadius: 4 }]
+                            },
+                            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
+                        });
+                    }
 
-                    lineChartInstance = new Chart(document.getElementById('lineChart').getContext('2d'), {
-                        type: 'line',
-                        data: {
-                            labels: data.charts.line.map((_, i) => `R${i+1}`),
-                            datasets: [{ label: 'Avg Rating Trend (%)', data: data.charts.line, borderColor: '#8b5cf6', tension: 0.3, fill: true, backgroundColor: 'rgba(139, 92, 246, 0.2)' }]
-                        },
-                        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
-                    });
+                    const lineData = (data.charts.line && Array.isArray(data.charts.line)) ? data.charts.line : [];
+                    const lineEl = document.getElementById('lineChart');
+                    if (lineEl) {
+                        lineChartInstance = new Chart(lineEl.getContext('2d'), {
+                            type: 'line',
+                            data: {
+                                labels: lineData.map((_, i) => `R${i+1}`),
+                                datasets: [{ label: 'Avg Rating Trend (%)', data: lineData, borderColor: '#8b5cf6', tension: 0.3, fill: true, backgroundColor: 'rgba(139, 92, 246, 0.2)' }]
+                            },
+                            options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100 } }, plugins: { legend: { display: false } } }
+                        });
+                    }
                 }
 
-                const list = document.getElementById('responsesList'); list.innerHTML = '';
-                if (data.responses.length === 0) list.innerHTML = '<p class="text-center text-slate-400 text-sm mt-10">No feedback yet.</p>';
-                data.responses.forEach(r => {
-                    let qa = JSON.parse(r.answers_json).map(a => `<div class="truncate text-xs mt-1"><span class="font-bold text-slate-700">${a.question}:</span> <span class="text-slate-600">${a.answer}</span></div>`).join('');
-                    let color = r.sentiment_label==='Positive'?'text-green-600 bg-green-50':r.sentiment_label==='Negative'?'text-red-600 bg-red-50':'text-slate-500 bg-slate-50';
-                    list.innerHTML += `<div class="p-3 bg-white border border-slate-100 rounded-xl mb-2"><div class="flex justify-between mb-1"><div class="font-bold text-sm">${r.student_name}</div><span class="text-[10px] font-bold px-2 py-0.5 rounded uppercase ${color}">${r.sentiment_label}</span></div>${qa}</div>`;
-                });
+                const list = document.getElementById('responsesList'); 
+                if (list) {
+                    list.innerHTML = '';
+                    const resps = data.responses || [];
+                    if (resps.length === 0) list.innerHTML = '<p class="text-center text-slate-400 text-sm mt-10">No feedback yet.</p>';
+                    resps.forEach(r => {
+                        let qa = '';
+                        try {
+                            qa = JSON.parse(r.answers_json || '[]').map(a => `<div class="truncate text-xs mt-1"><span class="font-bold text-slate-700">${a.question}:</span> <span class="text-slate-600">${a.answer}</span></div>`).join('');
+                        } catch(err) { qa = ''; }
+                        let color = r.sentiment_label==='Positive'?'text-green-600 bg-green-50':r.sentiment_label==='Negative'?'text-red-600 bg-red-50':'text-slate-500 bg-slate-50';
+                        list.innerHTML += `<div class="p-3 bg-white border border-slate-100 rounded-xl mb-2"><div class="flex justify-between mb-1"><div class="font-bold text-sm">${r.student_name}</div><span class="text-[10px] font-bold px-2 py-0.5 rounded uppercase ${color}">${r.sentiment_label || 'Neutral'}</span></div>${qa}</div>`;
+                    });
+                }
                 
                 if (data.sentiment) {
                     let maxSent = "Neutral";
                     if (data.sentiment.pos > data.sentiment.neu && data.sentiment.pos > data.sentiment.neg) maxSent = "Positive 😊";
                     else if (data.sentiment.neg > data.sentiment.neu && data.sentiment.neg > data.sentiment.pos) maxSent = "Negative 😞";
-                    document.getElementById('classSentiment').innerText = maxSent;
+                    const sentEl = document.getElementById('classSentiment');
+                    if (sentEl) sentEl.innerText = maxSent;
                 }
 
                 if (data.risk) {
-                    document.getElementById('riskScore').innerText = data.risk.score || 0;
-                    document.getElementById('riskLevel').innerText = data.risk.level || 'Low';
+                    const scoreEl = document.getElementById('riskScore');
+                    const levelEl = document.getElementById('riskLevel');
+                    const weakEl = document.getElementById('riskWeak');
+                    if (scoreEl) scoreEl.innerText = data.risk.score || 0;
+                    if (levelEl) levelEl.innerText = data.risk.level || 'Low';
                     const weak = (data.risk.weak_outcomes || []).join(', ');
-                    document.getElementById('riskWeak').innerText = weak || 'None';
+                    if (weakEl) weakEl.innerText = weak || 'None';
                 }
 
             } catch(e) { console.error("Error fetching data:", e); }
@@ -1561,6 +1586,39 @@
             setTimeout(() => {
                 window.print();
             }, 200);
+        };
+
+        window.deleteForm = async function(e, formId, formTitle) {
+            if (e) e.stopPropagation();
+            const targetId = formId || currentFormId;
+            if (!targetId) {
+                alert("Please select a form to delete.");
+                return;
+            }
+            const name = formTitle || (document.getElementById('selectedEventTitle') ? document.getElementById('selectedEventTitle').innerText : 'this form');
+            const confirmed = confirm(`Are you sure you want to permanently delete "${name}"?\n\nThis will remove all associated student responses, OBE attainment records, and activity reports.`);
+            if (!confirmed) return;
+
+            try {
+                const res = await fetch(`/api/forms/${targetId}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const data = await res.json();
+                if (res.ok && data.status === 'success') {
+                    if (currentFormId === targetId) {
+                        currentFormId = null;
+                        const aHeader = document.getElementById('analyticsHeader');
+                        if (aHeader) aHeader.classList.add('hidden');
+                    }
+                    await loadForms();
+                } else {
+                    alert(data.error || 'Failed to delete form');
+                }
+            } catch(err) {
+                console.error("Delete form error:", err);
+                alert("An error occurred while deleting the form.");
+            }
         };
 
         // Auto select first form when list loads

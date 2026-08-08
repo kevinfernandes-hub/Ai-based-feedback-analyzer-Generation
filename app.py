@@ -1004,6 +1004,34 @@ def toggle_form():
     conn.commit(); conn.close()
     return jsonify({"status": "success"})
 
+@app.route('/api/forms/<int:form_id>', methods=['DELETE'])
+@app.route('/api/delete_form', methods=['POST', 'DELETE'])
+def delete_form(form_id=None):
+    if 'user' not in session:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    if form_id is None:
+        data = request.get_json(silent=True) or (request.form.to_dict() if request.form else {}) or {}
+        form_id = data.get('form_id') or data.get('id')
+    
+    if not form_id:
+        return jsonify({"error": "form_id required"}), 400
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        c.execute("DELETE FROM event_reports WHERE form_id = ?", (form_id,))
+        c.execute("DELETE FROM responses WHERE form_id = ?", (form_id,))
+        c.execute("DELETE FROM forms WHERE id = ?", (form_id,))
+        conn.commit()
+        return jsonify({"status": "success", "message": "Form and associated records deleted successfully"})
+    except Exception as e:
+        conn.rollback()
+        app.logger.error(f"Error deleting form {form_id}: {str(e)}")
+        return jsonify({"error": f"Failed to delete form: {str(e)}"}), 500
+    finally:
+        conn.close()
+
 @app.route('/api/submit_feedback', methods=['POST'])
 @limiter.limit("30 per hour")
 def submit_feedback():

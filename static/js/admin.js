@@ -472,31 +472,44 @@ async function saveEventReportData(silent = false) {
     }
 }
 
+async function deleteForm(e, formId, formTitle) {
+    if (e) e.stopPropagation();
+    const targetId = formId || currentFormId;
+    if (!targetId) {
+        alert("Please select a form to delete.");
+        return;
+    }
+    const name = formTitle || (document.getElementById('selectedEventTitle') ? document.getElementById('selectedEventTitle').innerText : 'this form');
+    const confirmed = confirm(`Are you sure you want to permanently delete "${name}"?\n\nThis will remove all associated student responses, OBE attainment records, and activity reports.`);
+    if (!confirmed) return;
+
+    try {
+        const res = await fetch(`/api/forms/${targetId}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+            if (currentFormId === targetId) {
+                currentFormId = null;
+                const aHeader = document.getElementById('analyticsHeader');
+                if (aHeader) aHeader.classList.add('hidden');
+            }
+            if (typeof loadForms === 'function') {
+                await loadForms();
+            }
+        } else {
+            alert(data.error || 'Failed to delete form');
+        }
+    } catch(err) {
+        console.error("Delete form error:", err);
+        alert("An error occurred while deleting the form.");
+    }
+}
+
 function printEventReportDoc() {
-    const printContent = document.getElementById('printableReportDocument').innerHTML;
-    const printWindow = window.open('', '_blank', 'width=900,height=800');
-    printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Activity/Event Report - SVPCET</title>
-            <script src="https://cdn.tailwindcss.com"></script>
-            <style>
-                @media print {
-                    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 0; margin: 0; }
-                    @page { margin: 12mm; size: A4; }
-                }
-            </style>
-        </head>
-        <body class="bg-white p-6">
-            <div class="max-w-4xl mx-auto border-0">
-                ${printContent}
-            </div>
-            <script>
-                setTimeout(() => { window.print(); window.close(); }, 500);
-            </script>
-        </body>
-        </html>
-    `);
-    printWindow.document.close();
+    if (typeof switchReportTab === 'function') switchReportTab('preview');
+    setTimeout(() => {
+        window.print();
+    }, 200);
 }
