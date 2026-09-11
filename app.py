@@ -54,6 +54,10 @@ app.jinja_env.auto_reload = True
 APP_ENV = os.getenv("FLASK_ENV", "development").strip().lower()
 IS_PRODUCTION = APP_ENV == "production"
 
+# Vercel's deployed source directory is read-only; /tmp is the writable filesystem.
+if os.getenv("VERCEL") == "1":
+    app.instance_path = os.getenv("VERCEL_DATA_DIR", "/tmp/instance")
+
 # Rate limiting
 limiter = Limiter(
     app=app,
